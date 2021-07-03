@@ -280,7 +280,9 @@ while True:
                     pN = pN + 1
                 
 
-    
+    for x in 
+
+
     #populate NT with saved target list
     for x in personList:
         nTable.getSubTable("targets").getSubTable("person").getSubTable(str(getpNum(x))).putNumber("area", int(getpArea(x)/(1000)))
