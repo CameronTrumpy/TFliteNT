@@ -1,7 +1,7 @@
 ######## Webcam Object Detection Using Tensorflow-trained Classifier #########
 #
-# Author: Evan Juras
-# Date: 10/27/19
+# Author: @CameronTrumpy
+# Date: 7/31/2021
 # Description: 
 # This program uses a TensorFlow Lite model to perform object detection on a live webcam
 # feed. It draws boxes and scores around the objects of interest in each frame from the
@@ -22,7 +22,7 @@ import sys
 import time
 from threading import Thread
 import importlib.util
-import wpilib
+from processes.VideoStream import VideoStream
 from networktables import NetworkTables
 from networktables.util import ChooserControl
 
@@ -30,10 +30,14 @@ from networktables.util import ChooserControl
 serverIP='169.254.68.16'
 NetworkTables.initialize(server=serverIP)
 NetworkTables.deleteAllEntries()
-nTable = NetworkTables.getTable('SmartDashboard').getSubTable('pi')
+nTable = NetworkTables.getTable('FroggyVision')
+statusTable = nTable.getSubTable('Status')
+tgtTable = nTable.getSubTable('Targets')
+
+mainTgt = tgtTable.getSubTable('mainTgt')
 
 ##TARGET LIST AND METHODS - move methods to separate class???
-personList = [
+robotList = [
     #example entry
     #{'tgtNum': 0,'area': 0, 'conf': 0.0, 'tX': 0.0, 'tY': 0.0}    
 ]
@@ -41,10 +45,10 @@ personList = [
 pN = 1
 
 def getpArea(target):
-    return target.get('area')
+    return target.get('tA')
 
 def getpConf(target):
-    return target.get('conf')
+    return target.get('tConf')
 
 def getpNum(target):
     return target.get('tgtNum')
@@ -59,58 +63,15 @@ def gettY(target):
 ##START TARGETING MODE METHODS
 #tgtModes = ["largest", "centermost", "most_confident"]
 # largest = 0 centermost = 1 most_confident = 2
-nTable.putNumber("Targeting Mode", 0)
-
 def getTargetMode():
-    mode = nTable.getNumber("Targeting Mode", 0)
+    mode = statusTable.getNumber("Targeting Mode", 0)
     return mode
 
+statusTable.putNumber("Targeting Mode", 0)
 ##END TARGETING MODE METHODS
 
 xFov = 60
 yFov = 34
-
-# Define VideoStream class to handle streaming of video from webcam in separate processing thread
-# Source - Adrian Rosebrock, PyImageSearch: https://www.pyimagesearch.com/2015/12/28/increasing-raspberry-pi-fps-with-python-and-opencv/
-class VideoStream:
-    """Camera object that controls video streaming from the Picamera"""
-    def __init__(self,resolution=(640,480),framerate=30):
-        # Initialize the PiCamera and the camera image stream
-        self.stream = cv2.VideoCapture(0)
-        ret = self.stream.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc(*'MJPG'))
-        ret = self.stream.set(3,resolution[0])
-        ret = self.stream.set(4,resolution[1])
-            
-        # Read first frame from the stream
-        (self.grabbed, self.frame) = self.stream.read()
-
-	# Variable to control when the camera is stopped
-        self.stopped = False
-
-    def start(self):
-	# Start the thread that reads frames from the video stream
-        Thread(target=self.update,args=()).start()
-        return self
-
-    def update(self):
-        # Keep looping indefinitely until the thread is stopped
-        while True:
-            # If the camera is stopped, stop the thread
-            if self.stopped:
-                # Close camera resources
-                self.stream.release()
-                return
-
-            # Otherwise, grab the next frame from the stream
-            (self.grabbed, self.frame) = self.stream.read()
-
-    def read(self):
-	# Return the most recent frame
-        return self.frame
-
-    def stop(self):
-	# Indicate that the camera and thread should be stopped
-        self.stopped = True
 
 # Define and parse input arguments
 parser = argparse.ArgumentParser()
@@ -235,8 +196,8 @@ while True:
     scores = interpreter.get_tensor(output_details[2]['index'])[0] # Confidence of detected objects
     #num = interpreter.get_tensor(output_details[3]['index'])[0]  # Total number of detected objects (inaccurate and not needed)
     
-    #reset person list before next detection iteration
-    personList.clear()
+    #reset robot list before next detection iteration
+    robotList.clear()
     
     # Loop over all detections and draw detection box if confidence is above minimum threshold
     pN = 0
@@ -254,7 +215,7 @@ while True:
 
             # Draw label
             object_name = labels[int(classes[i])] # Look up object name from "labels" array using class index
-            label = '%s: %d%%' % (object_name + " " + str(pN), int(scores[i]*100)) # Example: 'person: 72%'
+            label = '%s: %d%%' % (object_name + " " + str(pN), int(scores[i]*100)) # Example: 'robot: 72%'
             labelSize, baseLine = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, 0.7, 2) # Get font size
             label_ymin = max(ymin, labelSize[1] + 10) # Make sure not to draw label too close to top of window
             cv2.rectangle(frame, (xmin, label_ymin-labelSize[1]-10), (xmin+labelSize[0], label_ymin+baseLine-10), (255, 255, 255), cv2.FILLED) # Draw white box to put label text in
@@ -265,8 +226,8 @@ while True:
             tgtXCenter = xmin + ((xmax-xmin)/2)
             tgtYCenter = ymin + ((ymax-ymin)/2)
             
-            if(object_name == "person"):
-                    personList.append({'tgtNum': pN, 'area': ((xmax-xmin)*(ymax-ymin)), 'conf': int(scores[i]*100),
+            if(object_name == "robot"):
+                    robotList.append({'tgtNum': pN, 'area': ((xmax-xmin)*(ymax-ymin)), 'conf': int(scores[i]*100),
                                       'tX': ((tgtXCenter - (imW/2))*((xFov/2)/(imW/2))), "tY": ((tgtYCenter - (imH/2))*((xFov/2)/(imH/2)))})
                     pN = pN + 1
                     
@@ -275,18 +236,17 @@ while True:
     cv2.putText(frame,'FPS: {0:.2f}'.format(frame_rate_calc),(30,50),cv2.FONT_HERSHEY_SIMPLEX,1,(255,255,0),2,cv2.LINE_AA)
     nTable.putNumber("FPS", frame_rate_calc)
     
-    #populate NT with saved target list
-    for x in personList:
-        nTable.getSubTable("targets").getSubTable("person").getSubTable(str(getpNum(x))).putNumber("area", int(getpArea(x)/(1000)))
-        nTable.getSubTable("targets").getSubTable("person").getSubTable(str(getpNum(x))).putNumber("conf", int(getpConf(x)))
-        nTable.getSubTable("targets").getSubTable("person").getSubTable(str(getpNum(x))).putNumber("tX", int(gettX(x)))
-        nTable.getSubTable("targets").getSubTable("person").getSubTable(str(getpNum(x))).putNumber("tY", int(gettY(x)))
+    #populate NT with saved target list    
     
     if getTargetMode() == 0:
-        personList.sort(key=getpArea)
-    if len(personList) > 0:
-        nTable.getSubTable("targets").getSubTable("person").putNumber("Main Target", getpNum(personList[0]))
-    
+        robotList.sort(key=getpArea)
+    if len(robotList) > 0:
+        x = robotList[0]
+        mainTgt.putNumber("area", int(getpArea(x)/(1000)))
+        mainTgt.putNumber("conf", int(getpConf(x)))
+        mainTgt.putNumber("tX", int(gettX(x)))
+        mainTgt.putNumber("tY", int(gettY(x)))
+
     # All the results have been drawn on the frame, so it's time to display it.
     cv2.imshow('Object detector', frame)
 
