@@ -32,18 +32,38 @@ serverIP='192.168.1.232'
 NetworkTables.initialize(server=serverIP)
 NetworkTables.deleteAllEntries()
 nTable = NetworkTables.getTable('FroggyVision')
-statusTable = nTable.getSubTable('Status')
-tgtTable = nTable.getSubTable('Targets')
+statusTable = nTable.getSubTable('status')
+tgtTable = nTable.getSubTable('targets')
 
 mainTgt = tgtTable.getSubTable('mainTgt')
+altTgts = tgtTable.getSubTable('altTgts')
 
-##TARGET LIST AND METHODS - move methods to separate class???
-robotList = [
+##START TARGETING MODE and type METHODS
+#tgtModes = ["largest", "centermost", "most_confident"]
+# largest = 0 centermost = 1 most_confident = 2
+def getTargetMode():
+    mode = tgtTable.getNumber('tgtMode')
+    return mode
+
+statusTable.putNumber('tgtMode', 0)
+
+def getTargetType():
+    type = statusTable.getString('tgtType')
+    return type
+
+statusTable.putString('tgtType', "robot")
+
+
+
+##END TARGETING MODE METHODS
+
+##TARGET LIST AND METHODS
+mainTgtList = [
     #example entry
     #{'tgtNum': 0,'area': 0, 'conf': 0.0, 'tX': 0.0, 'tY': 0.0}    
 ]
 
-pN = 1
+maintN = 1
 
 def gettA(target):
     return target.get('tA')
@@ -60,16 +80,6 @@ def gettX(target):
 def gettY(target):
     return target.get('tY')
 ##END TARGET LIST METHODS
-
-##START TARGETING MODE METHODS
-#tgtModes = ["largest", "centermost", "most_confident"]
-# largest = 0 centermost = 1 most_confident = 2
-def getTargetMode():
-    mode = statusTable.getNumber("Targeting Mode", 0)
-    return mode
-
-statusTable.putNumber("Targeting Mode", 0)
-##END TARGETING MODE METHODS
 
 xFov = 60
 yFov = 34
@@ -198,53 +208,67 @@ while True:
     #num = interpreter.get_tensor(output_details[3]['index'])[0]  # Total number of detected objects (inaccurate and not needed)
     
     #reset robot list before next detection iteration
-    robotList.clear()
+    mainTgtList.clear()
     
     # Loop over all detections and draw detection box if confidence is above minimum threshold
-    pN = 0
+    mainTgtN = 0
+    altTgtN = 0
     for i in range(len(scores)):
         if ((scores[i] > min_conf_threshold) and (scores[i] <= 1.0)):
 
-            # Get bounding box coordinates and draw box
+            # Get bounding box coordinates and draw box and crosshair
             # Interpreter can return coordinates that are outside of image dimensions, need to force them to be within image using max() and min()
             ymin = int(max(1,(boxes[i][0] * imH)))
             xmin = int(max(1,(boxes[i][1] * imW)))
             ymax = int(min(imH,(boxes[i][2] * imH)))
             xmax = int(min(imW,(boxes[i][3] * imW)))
+           
+            tgtXCenter = xmin + ((xmax-xmin)/2.0)
+            tgtYCenter = ymin + ((ymax-ymin)/2.0)
             
             cv2.rectangle(frame, (xmin,ymin), (xmax,ymax), (10, 255, 0), 2)
 
+            cv2.line(frame, (tgtXCenter-2,tgtYCenter), (tgtXCenter+2,tgtYCenter) (10, 255, 0), 1)
+            cv2.line(frame, (tgtXCenter,tgtYCenter-2), (tgtXCenter,tgtYCenter+2) (10, 255, 0), 1)
+
+
             # Draw label
             object_name = labels[int(classes[i])] # Look up object name from "labels" array using class index
-            label = '%s: %d%%' % (object_name + " " + str(pN), int(scores[i]*100)) # Example: 'robot: 72%'
+            label = '%s: %d%%' % (object_name + " " + str(mainTgtN), int(scores[i]*100)) # Example: 'robot: 72%'  
             labelSize, baseLine = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, 0.7, 2) # Get font size
             label_ymin = max(ymin, labelSize[1] + 10) # Make sure not to draw label too close to top of window
             cv2.rectangle(frame, (xmin, label_ymin-labelSize[1]-10), (xmin+labelSize[0], label_ymin+baseLine-10), (255, 255, 255), cv2.FILLED) # Draw white box to put label text in
             cv2.putText(frame, label, (xmin, label_ymin-7), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 0), 2) # Draw label text
             
             
-            #Populating list 
-            tgtXCenter = xmin + ((xmax-xmin)/2)
-            tgtYCenter = ymin + ((ymax-ymin)/2)
             
-            if(object_name == "robot"):
-                    robotList.append({'tgtNum': pN, 'tA': ((xmax-xmin)*(ymax-ymin)), 'tConf': int(scores[i]*100),
-                                      'tX': ((tgtXCenter - (imW/2))*((xFov/2)/(imW/2))), "tY": ((tgtYCenter - (imH/2))*((xFov/2)/(imH/2)))})
-                    pN = pN + 1
+             #Populating target list 
+            if(object_name == getTargetType()):
+                    mainTgtList.append({'tgtNum': mainTgtN, 'tA': ((xmax-xmin)*(ymax-ymin)), 'tConf': int(scores[i]*100.0),
+                                      'tX': ((tgtXCenter - (imW/2.0))*((xFov/2.0)/(imW/2.0))), "tY": ((tgtYCenter - (imH/2.0))*((xFov/2.0)/(imH/2.0)))})
+                    mainTgtN += 1
+            else:
+                altTgtN += 1
                     
     
+    altTgts.putNumber('targetCount', altTgtN)
+
     # Draw framerate in corner of frame and send to NT
     cv2.putText(frame,'FPS: {0:.2f}'.format(frame_rate_calc),(30,50),cv2.FONT_HERSHEY_SIMPLEX,1,(255,255,0),2,cv2.LINE_AA)
     statusTable.putNumber("FPS", frame_rate_calc)
-
     statusTable.putNumber("CPU Temp", PITemp.readTemp())
     
     #populate NT with saved target list    
     
     if getTargetMode() == 0:
-        robotList.sort(key=gettA)
-    if len(robotList) > 0:
-        x = robotList[0]
+        mainTgtList.sort(key=gettA)
+    elif getTargetMode() == 1:
+        mainTgtList.sort(key=gettX, reversed=True)
+    elif getTargetMode() == 2:
+        mainTgtList.sort(key=gettConf)
+
+    if len(mainTgtList) > 0:
+        x = mainTgtList[0]
         mainTgt.putNumber("area", int(gettA(x)/(1000)))
         mainTgt.putNumber("conf", int(gettConf(x)))
         mainTgt.putNumber("tX", int(gettX(x)))
@@ -257,9 +281,6 @@ while True:
     t2 = cv2.getTickCount()
     time1 = (t2-t1)/freq
     frame_rate_calc= 1/time1
-
-    #post data to NT
-    
 
     # Press 'q' to quit
     if cv2.waitKey(1) == ord('q'):
