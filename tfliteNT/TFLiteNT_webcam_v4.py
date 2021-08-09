@@ -22,12 +22,13 @@ import sys
 import time
 from threading import Thread
 import importlib.util
+from processes.PITemp import PITemp
 from processes.VideoStream import VideoStream
 from networktables import NetworkTables
 from networktables.util import ChooserControl
 
 #Init NT server
-serverIP='169.254.68.16'
+serverIP='192.168.1.232'
 NetworkTables.initialize(server=serverIP)
 NetworkTables.deleteAllEntries()
 nTable = NetworkTables.getTable('FroggyVision')
@@ -44,10 +45,10 @@ robotList = [
 
 pN = 1
 
-def getpArea(target):
+def gettA(target):
     return target.get('tA')
 
-def getpConf(target):
+def gettConf(target):
     return target.get('tConf')
 
 def getpNum(target):
@@ -227,23 +228,25 @@ while True:
             tgtYCenter = ymin + ((ymax-ymin)/2)
             
             if(object_name == "robot"):
-                    robotList.append({'tgtNum': pN, 'area': ((xmax-xmin)*(ymax-ymin)), 'conf': int(scores[i]*100),
+                    robotList.append({'tgtNum': pN, 'tA': ((xmax-xmin)*(ymax-ymin)), 'tConf': int(scores[i]*100),
                                       'tX': ((tgtXCenter - (imW/2))*((xFov/2)/(imW/2))), "tY": ((tgtYCenter - (imH/2))*((xFov/2)/(imH/2)))})
                     pN = pN + 1
                     
     
     # Draw framerate in corner of frame and send to NT
     cv2.putText(frame,'FPS: {0:.2f}'.format(frame_rate_calc),(30,50),cv2.FONT_HERSHEY_SIMPLEX,1,(255,255,0),2,cv2.LINE_AA)
-    nTable.putNumber("FPS", frame_rate_calc)
+    statusTable.putNumber("FPS", frame_rate_calc)
+
+    statusTable.putNumber("CPU Temp", PITemp.readTemp())
     
     #populate NT with saved target list    
     
     if getTargetMode() == 0:
-        robotList.sort(key=getpArea)
+        robotList.sort(key=gettA)
     if len(robotList) > 0:
         x = robotList[0]
-        mainTgt.putNumber("area", int(getpArea(x)/(1000)))
-        mainTgt.putNumber("conf", int(getpConf(x)))
+        mainTgt.putNumber("area", int(gettA(x)/(1000)))
+        mainTgt.putNumber("conf", int(gettConf(x)))
         mainTgt.putNumber("tX", int(gettX(x)))
         mainTgt.putNumber("tY", int(gettY(x)))
 
