@@ -42,13 +42,13 @@ altTgts = tgtTable.getSubTable('altTgts')
 #tgtModes = ["largest", "centermost", "most_confident"]
 # largest = 0 centermost = 1 most_confident = 2
 def getTargetMode():
-    mode = tgtTable.getNumber('tgtMode')
+    mode = tgtTable.getNumber('tgtMode', 0)
     return mode
 
 statusTable.putNumber('tgtMode', 0)
 
 def getTargetType():
-    type = statusTable.getString('tgtType')
+    type = statusTable.getString('tgtType', "robot")
     return type
 
 statusTable.putString('tgtType', "robot")
@@ -79,6 +79,12 @@ def gettX(target):
 
 def gettY(target):
     return target.get('tY')
+
+def getXCenter(target):
+    return target.get('xCenter')
+
+def getYCenter(target):
+    return target.get('yCenter')
 ##END TARGET LIST METHODS
 
 xFov = 60
@@ -216,7 +222,7 @@ while True:
     for i in range(len(scores)):
         if ((scores[i] > min_conf_threshold) and (scores[i] <= 1.0)):
 
-            # Get bounding box coordinates and draw box and crosshair
+            # Get bounding box coordinates and draw box
             # Interpreter can return coordinates that are outside of image dimensions, need to force them to be within image using max() and min()
             ymin = int(max(1,(boxes[i][0] * imH)))
             xmin = int(max(1,(boxes[i][1] * imW)))
@@ -227,10 +233,6 @@ while True:
             tgtYCenter = ymin + ((ymax-ymin)/2.0)
             
             cv2.rectangle(frame, (xmin,ymin), (xmax,ymax), (10, 255, 0), 2)
-
-            cv2.line(frame, (tgtXCenter-2,tgtYCenter), (tgtXCenter+2,tgtYCenter) (10, 255, 0), 1)
-            cv2.line(frame, (tgtXCenter,tgtYCenter-2), (tgtXCenter,tgtYCenter+2) (10, 255, 0), 1)
-
 
             # Draw label
             object_name = labels[int(classes[i])] # Look up object name from "labels" array using class index
@@ -244,8 +246,15 @@ while True:
             
              #Populating target list 
             if(object_name == getTargetType()):
-                    mainTgtList.append({'tgtNum': mainTgtN, 'tA': ((xmax-xmin)*(ymax-ymin)), 'tConf': int(scores[i]*100.0),
-                                      'tX': ((tgtXCenter - (imW/2.0))*((xFov/2.0)/(imW/2.0))), "tY": ((tgtYCenter - (imH/2.0))*((xFov/2.0)/(imH/2.0)))})
+
+                    tArea = ((xmax-xmin)*(ymax-ymin))
+                    confidence = int(scores[i]*100.0)
+                    tX = ((tgtXCenter - (imW/2.0))*((xFov/2.0)/(imW/2.0)))
+                    tY = ((tgtYCenter - (imH/2.0))*((xFov/2.0)/(imH/2.0)))
+
+                    mainTgtList.append({'tgtNum': mainTgtN, 'tA': tArea, 'tConf': confidence,
+                                      'tX': tX, 'tY': tY, 'xCenter':tgtXCenter, 'yCenter':tgtYCenter})
+
                     mainTgtN += 1
             else:
                 altTgtN += 1
@@ -258,21 +267,28 @@ while True:
     statusTable.putNumber("FPS", frame_rate_calc)
     statusTable.putNumber("CPU Temp", PITemp.readTemp())
     
-    #populate NT with saved target list    
+    #populate NT with saved target list, reversed sort ensures sorting in descending order    
     
     if getTargetMode() == 0:
-        mainTgtList.sort(key=gettA)
+        mainTgtList.sort(key=gettA, reverse=True)
     elif getTargetMode() == 1:
-        mainTgtList.sort(key=gettX, reversed=True)
+        mainTgtList.sort(key=gettX)
     elif getTargetMode() == 2:
-        mainTgtList.sort(key=gettConf)
+        mainTgtList.sort(key=gettConf, reverse=True)
 
+    #if there are any main targets, take the highest priority target. draw target crosshair and populate NT data
     if len(mainTgtList) > 0:
-        x = mainTgtList[0]
-        mainTgt.putNumber("area", int(gettA(x)/(1000)))
-        mainTgt.putNumber("conf", int(gettConf(x)))
-        mainTgt.putNumber("tX", int(gettX(x)))
-        mainTgt.putNumber("tY", int(gettY(x)))
+        t = mainTgtList[0]
+        mainTgt.putValue("area", gettA(t)/(1000))
+        mainTgt.putNumber("conf", int(gettConf(t)))
+        mainTgt.putValue("tX", gettX(t))
+        mainTgt.putValue("tY", gettY(t))
+        
+        xCenter = int(getXCenter(t))
+        yCenter = int(getYCenter(t))
+
+        cv2.line(frame, (xCenter-4,yCenter), (xCenter+4,yCenter), (0, 255, 0), 2)
+        cv2.line(frame, (xCenter,yCenter-4), (xCenter,yCenter+4), (0, 255, 0), 2)
 
     # All the results have been drawn on the frame, so it's time to display it.
     cv2.imshow('Object detector', frame)
