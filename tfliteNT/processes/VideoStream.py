@@ -1,4 +1,6 @@
-# Define VideoStream class to handle streaming of video from webcam in separate processing thread
+# THIS IS YOUR INPUT VIDEO STREAM WITHOUT ANY POST PROCESSING
+
+# Defining VideoStream class to handle streaming of video from webcam in separate processing thread 
 # Source - Adrian Rosebrock, PyImageSearch: https://www.pyimagesearch.com/2015/12/28/increasing-raspberry-pi-fps-with-python-and-opencv/
 from threading import Thread
 import cv2

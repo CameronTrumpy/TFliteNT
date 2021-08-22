@@ -28,7 +28,7 @@ from networktables import NetworkTables
 from networktables.util import ChooserControl
 
 #Init NT server
-serverIP='192.168.1.232'
+serverIP='10.5.2.2'
 NetworkTables.initialize(server=serverIP)
 NetworkTables.deleteAllEntries()
 nTable = NetworkTables.getTable('FroggyVision')
