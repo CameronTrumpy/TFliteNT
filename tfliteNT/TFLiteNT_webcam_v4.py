@@ -24,6 +24,7 @@ from threading import Thread
 import importlib.util
 from processes.PITemp import PITemp
 from processes.VideoStream import VideoStream
+from processes.MJPGHandler import MJPGHandler
 from networktables import NetworkTables
 from networktables.util import ChooserControl
 
@@ -179,8 +180,9 @@ input_std = 127.5
 frame_rate_calc = 1
 freq = cv2.getTickFrequency()
 
-# Initialize video stream
+# Initialize video stream & output mjpg stream
 videostream = VideoStream(resolution=(imW,imH),framerate=30).start()
+mjpgStream = MJPGHandler.start()
 time.sleep(1)
 
 #for frame1 in camera.capture_continuous(rawCapture, format="bgr",use_video_port=True):
@@ -292,6 +294,7 @@ while True:
 
     # All the results have been drawn on the frame, so it's time to display it.
     cv2.imshow('Object detector', frame)
+    mjpgStream.writeFrame(frame)
 
     # Calculate framerate
     t2 = cv2.getTickCount()
@@ -303,5 +306,7 @@ while True:
         break
 
 # Clean up
-cv2.destroyAllWindows()
+mjpgStream.stop()
 videostream.stop()
+cv2.destroyAllWindows()
+

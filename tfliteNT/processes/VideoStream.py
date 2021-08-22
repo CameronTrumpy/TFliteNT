@@ -41,6 +41,9 @@ class VideoStream:
 	# Return the most recent frame
         return self.frame
 
+    def show(frame):
+        cv2.imshow("VideoStream",frame)
+
     def stop(self):
 	# Indicate that the camera and thread should be stopped
         self.stopped = True
