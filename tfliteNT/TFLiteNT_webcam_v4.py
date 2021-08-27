@@ -182,7 +182,7 @@ freq = cv2.getTickFrequency()
 
 # Initialize video stream & output mjpg stream
 videostream = VideoStream(resolution=(imW,imH),framerate=30).start()
-mjpgStream = MJPGHandler.start()
+mjpgStream = MJPGHandler().start()
 time.sleep(1)
 
 #for frame1 in camera.capture_continuous(rawCapture, format="bgr",use_video_port=True):
