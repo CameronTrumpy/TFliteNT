@@ -265,10 +265,13 @@ while True:
     altTgts.putNumber('targetCount', altTgtN)
 
     # Draw framerate in corner of frame and send to NT
-    cv2.putText(frame,'FPS: {0:.2f}'.format(frame_rate_calc),(30,50),cv2.FONT_HERSHEY_SIMPLEX,1,(255,255,0),2,cv2.LINE_AA)
+    cv2.putText(frame,'FPS: {0:.2f}'.format(frame_rate_calc),(20,40),cv2.FONT_HERSHEY_SIMPLEX,0.6,(255,255,0),1,cv2.LINE_AA)
     statusTable.putNumber("FPS", frame_rate_calc)
-    statusTable.putNumber("CPU Temp", PITemp.readTemp())
-    
+    tempC = PITemp.readTemp()
+    statusTable.putNumber("CPU Temp", tempC)
+    cv2.putText(frame,'{0:.1f}C'.format(tempC),(20,65),cv2.FONT_HERSHEY_SIMPLEX,0.6,(255,255,0),1,cv2.LINE_AA)
+
+
     #populate NT with saved target list, reversed sort ensures sorting in descending order    
     
     if getTargetMode() == 0:

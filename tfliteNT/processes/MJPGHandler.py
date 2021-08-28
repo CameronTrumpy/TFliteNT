@@ -24,6 +24,7 @@ class MJPGHandler:
         self.stopped = False
         self.grabbed, self.frame = True, blankFrame
         
+        #IP ADDRESS WILL HAVE TO BE CHANGED TO ADDRESS ON ROBOT
         self.server = ThreadedHTTPServer(('192.168.1.199', 8080), CamHandler)
         print("server started at http://192.168.1.199:8080/cam.html")        
         
