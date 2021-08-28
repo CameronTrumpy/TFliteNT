@@ -29,7 +29,7 @@ from networktables import NetworkTables
 from networktables.util import ChooserControl
 
 #Init NT server
-serverIP='10.5.2.2'
+serverIP='192.168.1.232'
 NetworkTables.initialize(server=serverIP)
 NetworkTables.deleteAllEntries()
 nTable = NetworkTables.getTable('FroggyVision')
@@ -293,7 +293,7 @@ while True:
         cv2.line(frame, (xCenter,yCenter-4), (xCenter,yCenter+4), (0, 255, 0), 2)
 
     # All the results have been drawn on the frame, so it's time to display it.
-    cv2.imshow('Object detector', frame)
+    #cv2.imshow('Object detector', frame)
     mjpgStream.writeFrame(frame)
 
     # Calculate framerate
@@ -306,7 +306,8 @@ while True:
         break
 
 # Clean up
+cv2.destroyAllWindows()
 mjpgStream.stop()
 videostream.stop()
-cv2.destroyAllWindows()
+
 
